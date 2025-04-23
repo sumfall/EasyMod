@@ -26,7 +26,6 @@ async def on_startup():
 @slash_command(
     name="say", description="Makes the bot say what its owner wants it to say:"
 )
-@integration_types(user=True)
 @check(is_owner())
 @slash_option(
     name="text",
