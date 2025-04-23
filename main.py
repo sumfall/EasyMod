@@ -9,6 +9,7 @@ from interactions import (
     slash_option,
     check,
     integration_types,
+    is_owner,
 )
 
 BOT_TOKEN = open("token.txt", "r").read().strip()
@@ -19,6 +20,27 @@ bot = Client(intents=Intents.ALL, basic_logging=True)
 @interactions.listen()
 async def on_startup():
     print("EasyMod is ready")
+
+
+# Slash commands
+@slash_command(
+    name="say", description="Makes the bot say what its owner wants it to say:"
+)
+@integration_types(user=True)
+@check(is_owner())
+@slash_option(
+    name="text",
+    description="Adds text",
+    required=False,
+    opt_type=OptionType.STRING,
+)
+async def channel_function(ctx: SlashContext, text: str = None):
+    if not text:
+        print("ERROR: Please select an option")
+        await ctx.send("ERROR: Please select an option", ephemeral=True)
+    elif text:
+        print("Sent: " + text)
+        await ctx.send(text)
 
 
 # Start bot
