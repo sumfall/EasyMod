@@ -8,7 +8,6 @@ from interactions import (
     OptionType,
     slash_option,
     check,
-    integration_types,
     is_owner,
 )
 
