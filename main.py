@@ -68,7 +68,7 @@ def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
 # Slash commands
 # /say
 @slash_command(
-    name="say", description="Makes the bot say what its owner wants it to say:"
+    name="say", description="Makes the bot say what its owner wants it to say"
 )
 @check(is_owner())
 @slash_option(
@@ -80,7 +80,7 @@ def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
 async def channel_function(ctx: SlashContext, text: str = None):
     if not text:
         print("ERROR: Please select an option")
-        await ctx.send("ERROR: Please select an option", ephemeral=True)
+        await ctx.send("❌ Please select an option", ephemeral=True)
     elif text:
         print("Sent: " + text)
         await ctx.send(text)
@@ -116,17 +116,17 @@ async def timeout_command(
 ):
     if not ctx.guild or not isinstance(ctx.author, Member):
         await ctx.send(
-            "Command must be run in a server and you need mod perms", ephemeral=True
+            "❌ Command must be run in a server and you need mod perms", ephemeral=True
         )
         return
     # Stops you from doing a stupid
     if user == ctx.author or user.id == ctx.bot.user.id:
-        await ctx.send("You can't time yourself or the bot out lmao", ephemeral=True)
+        await ctx.send("❌ You can't time yourself or the bot out lmao", ephemeral=True)
         return
 
     delta = timeout_time_logic(duration)
     if delta is None:
-        await ctx.send("Invalid time (max 28d use s/m/h/d/w)", ephemeral=True)
+        await ctx.send("❌ Invalid time (max 28d use s/m/h/d/w)", ephemeral=True)
         return
 
     # Perm checks
@@ -135,7 +135,7 @@ async def timeout_command(
         guild_owner = await ctx.guild.fetch_owner()
         # Stops you from timing out the server owner
         if user == guild_owner:
-            await ctx.send("Cannot timeout the server owner", ephemeral=True)
+            await ctx.send("❌ Cannot timeout the server owner", ephemeral=True)
             return
 
         author: Member = ctx.author
@@ -148,21 +148,21 @@ async def timeout_command(
             and (not author.top_role or user.top_role >= author.top_role)
         ):
             await ctx.send(
-                "Your role is not high enough to timeout this user", ephemeral=True
+                "❌ Your role is not high enough to timeout this user", ephemeral=True
             )
             return
         if user.top_role and (
             not bot_member.top_role or user.top_role >= bot_member.top_role
         ):
             await ctx.send(
-                "My role is not high enough to timeout this user", ephemeral=True
+                "❌ My role is not high enough to timeout this user", ephemeral=True
             )
             return
 
     except Exception as e:
         # Log and report errors during checks
         print(f"Hierarchy check error: {e}")  # Log essential errors
-        await ctx.send("An error occurred while checking roles", ephemeral=True)
+        await ctx.send("❌ An error occurred while checking roles", ephemeral=True)
         return
 
     # Timeout
@@ -171,9 +171,10 @@ async def timeout_command(
         await user.timeout(communication_disabled_until=expires_at, reason=reason)
 
         # Format confirmation message
-        reason_text = f" Reason: {reason}" if reason else ""
+        reason_text = f"{reason}" if reason else ""
         await ctx.send(
-            f"✅ Timed out {user.mention} until <t:{int(expires_at.timestamp())}:F> ({delta}).{reason_text}"
+            #    f"✅ Timed out {user.mention} until <t:{int(expires_at.timestamp())}:F> ({delta}).{reason_text}"
+            f"✅ Timed out {user.mention} for {delta} because: {reason_text}"
         )
 
     # Error Handling
@@ -183,7 +184,7 @@ async def timeout_command(
         await ctx.send(f"❌ Discord API error: {e.status}", ephemeral=True)
     except OverflowError:
         await ctx.send(
-            "Invalid date calculation (duration likely too long)", ephemeral=True
+            "❌ Invalid date calculation (duration likely too long)", ephemeral=True
         )
     except Exception as e:
         print(f"Timeout error: {e}")
