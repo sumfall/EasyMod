@@ -92,7 +92,7 @@ async def channel_function(ctx: SlashContext, text: str = None):
     description="Times out a user for a set amount of time",
     default_member_permissions=Permissions.MODERATE_MEMBERS,
 )
-# /timeout ommand options
+# /timeout command options
 @slash_option(
     name="user",
     description="Who do you wanna timeout?",
@@ -101,7 +101,7 @@ async def channel_function(ctx: SlashContext, text: str = None):
 )
 @slash_option(
     name="duration",
-    description="Amount of time (Max 28d)",
+    description="Amount of time (28 days)",
     required=True,
     opt_type=OptionType.STRING,
 )
