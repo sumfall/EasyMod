@@ -34,6 +34,7 @@ def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
     if not matches:
         return None
 
+    global total_seconds
     total_seconds = 0
     # Calculate total seconds
     for value, unit in matches:
@@ -57,7 +58,6 @@ def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
         return None
 
     delta = datetime.timedelta(seconds=total_seconds)
-
     # Check against Discord's maximum timeout time
     if delta > datetime.timedelta(days=28):
         return None
@@ -194,13 +194,22 @@ async def timeout_add_subcommand(
         await user.timeout(communication_disabled_until=tend_time, reason=reason)
 
         # Format confirmation message
-        reason_text = f" {reason}" if reason else ""
-        await ctx.send(
-            # f"✅ Timed out {user.mention} until <t:{int(tend_time.timestamp())}:F> ({delta}).{reason_text}"
-            f"✅ Timeout added for {user.mention} for {delta} because: {reason_text}"
-        )
+        reason_text = f" because {reason}" if reason else ""
+
+        if total_seconds >= 86400:
+            delta1 = str(delta)
+            await ctx.send(
+                f"✅ Timeout added for {user.mention} for {delta1.replace(", 0:00:00", "")}{reason_text}"
+            )
+            print(
+                f"✅ Timeout added for {user.mention} until <t:{int(tend_time.timestamp())}:F> for {delta1.replace(", 0:00:00", "")}{reason_text}"
+            )
+        else:
+            await ctx.send(
+                f"✅ Timeout added for {user.mention} for {delta}{reason_text}"
+            )
         print(
-            f"✅ Timeout added for {user.mention} until <t:{int(tend_time.timestamp())}:F> for {delta}, Reason: {reason_text}"
+            f"✅ Timeout added for {user.mention} until <t:{int(tend_time.timestamp())}:F> for {delta}{reason_text}"
         )
 
     # Error Handling
@@ -303,9 +312,9 @@ async def timeout_remove_subcommand(
             reason=reason or f"Timeout removed by {author}]",
         )
 
-        reason_text = f" Reason: {reason}" if reason else ""
-        await ctx.send(f"✅ Timeout removed for {user.mention} because: {reason_text}")
-        print(f"Removed timeout for {user}. Reason: {reason or 'None'}")
+        reason_text = f" because {reason}" if reason else ""
+        await ctx.send(f"✅ Timeout removed for {user.mention}{reason_text}")
+        print(f"Removed timeout for {user}{reason or 'None'}")
 
     # Error Handling
     except errors.Forbidden:
