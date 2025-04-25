@@ -27,7 +27,7 @@ async def on_startup():
     print("EasyMod is ready")
 
 
-# /timeout logic
+# Timekeeping logic
 def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
     regex = re.compile(r"(\d+)\s*([smhdw])")
     matches = regex.findall(duration_str.lower())
