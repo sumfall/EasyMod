@@ -3,6 +3,8 @@ import interactions
 import datetime
 import traceback
 import re
+import wikipedia
+from wikipedia import exceptions as wiki_exceptions
 from interactions import (
     Client,
     Intents,
@@ -231,7 +233,7 @@ async def timeout_add_subcommand(
         print(f"Timeout error: {e}")
         traceback.print_exc()  # Log detailed traceback for unexpected errors
         await ctx.send(
-            "❌ An unexpected error occurred while applying the timeout",
+            "❌ An unexpected error occurred please report this on the GitHub in my bio if it persists",
             ephemeral=True,
         )
 
@@ -330,7 +332,65 @@ async def timeout_remove_subcommand(
         print(f"Remove timeout error: {e}")
         traceback.print_exc()
         await ctx.send(
-            "❌ An unexpected error occurred while removing the timeout",
+            "❌ An unexpected error occurred please report this on the GitHub in my bio if it persists",
+            ephemeral=True,
+        )
+
+
+# /wikipedia
+@slash_command(name="wikipedia", description="Search wikipedia")
+@slash_option(
+    name="query",
+    description="What do you wanna search on wikipedia?",
+    required=True,
+    opt_type=OptionType.STRING,
+)
+async def wikipedia_search(ctx: SlashContext, query: str):
+    # Defer response cause wikipedia search takes awhile sometimes
+    await ctx.defer()
+
+    print(f"{ctx.author.display_name} searched wikipedia for: {query}")
+    try:
+        # Get summary
+        summary = wikipedia.summary(
+            query, sentences=3, auto_suggest=False
+        )  # auto_suggest=False stops the thing from giving dumb suggestions
+        if len(summary) > 1990:  # Keep under Discord limits (2000 char)
+            summary = summary[:1990] + "..."
+        await ctx.send(f"**{query}**:\n{summary}")  # Sends the summary
+
+    # Error Handling
+    except wiki_exceptions.DisambiguationError as e:
+        # For when you're not specific enough
+        print(
+            f"wikipedia DisambiguationError for query '{query}': {e.options[:5]}"
+        )  # Logs the first few options
+        options_list = "\n- ".join(e.options[:5])  # Shows the first 5 suggestions
+        await ctx.send(
+            f"❌ Your query '{query}' could refer to multiple pages. Please be more specific\n"
+            f"Did you mean:\n- {options_list}",
+            ephemeral=True,
+        )
+    except wiki_exceptions.PageError:
+        # For when the page doesn't exist
+        print(f"wikipedia PageError for query '{query}'")
+        await ctx.send(
+            f"❌ Couldn't find a wikipedia page for '{query}' try different wording?",
+            ephemeral=True,
+        )
+    except wiki_exceptions.wikipediaException as e:
+        # Find other errors from the wikipedia lib
+        print(f"Wikipedia lib error for query '{query}': {e}")
+        await ctx.send(
+            "❌ An error occurred while contacting wikipedia try again later",
+            ephemeral=True,
+        )
+    except Exception as e:
+        # Find other unexpected errors
+        print(f"Unexpected error in /wikipedia command for query '{query}': {e}")
+        traceback.print_exc()
+        await ctx.send(
+            "❌ An unexpected error occurred please report this on the GitHub in my bio if it persists",
             ephemeral=True,
         )
 
