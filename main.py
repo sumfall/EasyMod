@@ -536,6 +536,111 @@ async def ban_command(
         )
 
 
+# /kick
+@slash_command(
+    name="kick",
+    description="Kicks a user from the server",
+    # Requires the Kick Members permission
+    default_member_permissions=Permissions.KICK_MEMBERS,
+)
+@slash_option(
+    name="user",
+    description="The user you wanna kick",
+    required=True,
+    opt_type=OptionType.USER,  # Kicking requires the user to be a member
+)
+@slash_option(
+    name="reason",
+    description="Your reason for the kick (optional)",
+    required=False,
+    opt_type=OptionType.STRING,
+)
+async def kick_command(
+    ctx: SlashContext,
+    user: Member,  # Kick target must be a member currently in the server
+    reason: str | None = None,
+):
+    # Initial checks
+    if not ctx.guild or not isinstance(ctx.author, Member):
+        await ctx.send(
+            "❌ Command must be run in a server and you need perms/roles",
+            ephemeral=True,
+        )
+        return
+    # Can't kick yourself or bot
+    if user.id == ctx.author.id or user.id == ctx.bot.user.id:
+        await ctx.send("❌ You cannot kick yourself or the bot", ephemeral=True)
+        return
+
+    # Perm/role checks
+    try:
+        server_owner = await ctx.guild.fetch_owner()
+        # Can't kick the server owner
+        if user.id == server_owner.id:
+            await ctx.send("❌ You can't kick the server owner", ephemeral=True)
+            return
+
+        author: Member = ctx.author
+        bot_id = await ctx.guild.fetch_member(ctx.bot.user.id)
+        if not bot_id:
+            raise Exception("Bot id object not found")
+
+        # Check author roles vs target roles
+        if (
+            author != server_owner
+            and user.top_role
+            and (not author.top_role or user.top_role >= author.top_role)
+        ):
+            await ctx.send(
+                "❌ Your role isn't high enough to kick that user", ephemeral=True
+            )
+            return
+        # Check bot roles vs target roles
+        if user.top_role and (not bot_id.top_role or user.top_role >= bot_id.top_role):
+            await ctx.send(
+                "❌ My role isn't high enough to kick that user", ephemeral=True
+            )
+            return
+
+    except Exception as e:
+        print(f"Hierarchy check error (kick): {e}")
+        traceback.print_exc()
+        await ctx.send(
+            "❌ An error occurred while checking roles report it on GitHub if it persists",
+            ephemeral=True,
+        )
+        return
+
+    try:
+        # Kick them using guild.kick()
+        await ctx.guild.kick(
+            user.id,  # Pass the user ID as the first argument
+            reason=reason or f"Kicked by {ctx.author.display_name}",  # Default reason
+        )
+
+        reason_clause = f" because {reason}" if reason else "."
+        await ctx.send(f"✅ Kicked {user.mention}{reason_clause}")
+        print(f"Kicked {user} (ID: {user.id}). Reason: {reason or 'None'}.")
+
+    # Error handling
+    except errors.Forbidden:
+        await ctx.send(
+            "❌ Permission denied: Check if I have the 'Kick Members' perm and that my role is high enough",
+            ephemeral=True,
+        )
+        print(f"ERROR: Forbidden - Cannot kick {user} check perms/roles")
+    except errors.HTTPException as e:
+        await ctx.send(f"❌ Discord API error: {e.status} - {e.text}", ephemeral=True)
+        print(f"ERROR: HTTP Exception {e.status} - {e.text}")
+    except Exception as e:
+        print(f"Kick command error: {e}")
+        traceback.print_exc()
+        await ctx.send(
+            "❌ An unexpected error occurred while trying to kick report it on GitHub if it's persistent",
+            ephemeral=True,
+        )
+
+
 # Start bot
 if __name__ == "__main__":
     try:
