@@ -1,2 +1,3 @@
 discord-py-interactions
 discord-typings
+wikipedia
