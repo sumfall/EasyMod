@@ -68,6 +68,7 @@ def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
 
 
 # Slash commands
+# Fun commands lol
 # /say
 @slash_command(
     name="say", description="Makes the bot say what its owner wants it to say"
@@ -79,7 +80,7 @@ def timeout_time_logic(duration_str: str) -> datetime.timedelta | None:
     required=False,
     opt_type=OptionType.STRING,
 )
-async def channel_function(ctx: SlashContext, text: str = None):
+async def say_command(ctx: SlashContext, text: str = None):
     if not text:
         print("ERROR: Please select an option")
         await ctx.send("❌ Please select an option", ephemeral=True)
@@ -88,6 +89,65 @@ async def channel_function(ctx: SlashContext, text: str = None):
         await ctx.send(text)
 
 
+# /wikipedia
+@slash_command(name="wikipedia", description="Search wikipedia")
+@slash_option(
+    name="query",
+    description="What do you wanna search on wikipedia?",
+    required=True,
+    opt_type=OptionType.STRING,
+)
+async def wikipedia_search(ctx: SlashContext, query: str):
+    # Defer response cause wikipedia search takes awhile sometimes
+    await ctx.defer()
+
+    print(f"{ctx.author.display_name} searched wikipedia for: {query}")
+    try:
+        # Get summary
+        summary = wikipedia.summary(
+            query, sentences=3, auto_suggest=False
+        )  # auto_suggest=False stops the thing from giving dumb suggestions
+        if len(summary) > 1990:  # Keep under Discord limits (2000 char)
+            summary = summary[:1990] + "..."
+        await ctx.send(f"**{query}**:\n{summary}")  # Sends the summary
+
+    # Error Handling
+    except wiki_exceptions.DisambiguationError as e:
+        # For when you're not specific enough
+        print(
+            f"wikipedia DisambiguationError for query '{query}': {e.options[:5]}"
+        )  # Logs the first few options
+        options_list = "\n- ".join(e.options[:5])  # Shows the first 5 suggestions
+        await ctx.send(
+            f"❌ Your query '{query}' could refer to multiple pages. Please be more specific\n"
+            f"Did you mean:\n- {options_list}",
+            ephemeral=True,
+        )
+    except wiki_exceptions.PageError:
+        # For when the page doesn't exist
+        print(f"wikipedia PageError for query '{query}'")
+        await ctx.send(
+            f"❌ Couldn't find a wikipedia page for '{query}' try different wording?",
+            ephemeral=True,
+        )
+    except wiki_exceptions.wikipediaException as e:
+        # Find other errors from the wikipedia lib
+        print(f"Wikipedia lib error for query '{query}': {e}")
+        await ctx.send(
+            "❌ An error occurred while contacting wikipedia try again later",
+            ephemeral=True,
+        )
+    except Exception as e:
+        # Find other unexpected errors
+        print(f"Unexpected error in /wikipedia command for query '{query}': {e}")
+        traceback.print_exc()
+        await ctx.send(
+            "❌ An unexpected error occurred please report this on the GitHub in my bio if it persists",
+            ephemeral=True,
+        )
+
+
+# Moderation commands
 # /timeout
 @slash_command(
     name="timeout",
@@ -337,60 +397,141 @@ async def timeout_remove_subcommand(
         )
 
 
-# /wikipedia
-@slash_command(name="wikipedia", description="Search wikipedia")
+# /ban
+@slash_command(
+    name="ban",
+    description="Bans a user from the server",
+    # Requires the Ban Members permission
+    default_member_permissions=Permissions.BAN_MEMBERS,
+)
 @slash_option(
-    name="query",
-    description="What do you wanna search on wikipedia?",
+    name="user",
+    description="The user you wanna ban",
     required=True,
+    opt_type=OptionType.USER,
+)
+@slash_option(
+    name="reason",
+    description="Your reason for the ban (optional)",
+    required=False,
     opt_type=OptionType.STRING,
 )
-async def wikipedia_search(ctx: SlashContext, query: str):
-    # Defer response cause wikipedia search takes awhile sometimes
-    await ctx.defer()
+@slash_option(
+    name="delete_messages",
+    description="Number of days of messages you wanna delete (0-7 the default is 0)",
+    required=False,
+    opt_type=OptionType.INTEGER,
+    min_value=0,
+    max_value=7,
+)
+async def ban_command(
+    ctx: SlashContext,
+    user: interactions.User | Member,
+    reason: str | None = None,
+    delete_messages: int = 0,  # Default is 0 days
+):
+    # Initial checks
+    if not ctx.guild or not isinstance(ctx.author, Member):
+        await ctx.send(
+            "❌ Command must be run in a server and you need perms/roles",
+            ephemeral=True,
+        )
+        return
+    # stops you from doing another stupid lol
+    if user.id == ctx.author.id or user.id == ctx.bot.user.id:
+        await ctx.send("❌ You cannot ban yourself or the bot", ephemeral=True)
+        return
 
-    print(f"{ctx.author.display_name} searched wikipedia for: {query}")
+    # Perm/role checks
+    target_member: Member | None = None
+    if isinstance(user, Member):
+        target_member = user
+    else:
+        try:
+            target_member = await ctx.guild.fetch_member(user.id)
+        except errors.NotFound:
+            pass
+        except Exception as e:
+            print(f"Error fetching member for ban check: {e}")
+            await ctx.send(
+                "❌ Could not verify target user's status in the server",
+                ephemeral=True,
+            )
+            return
+
     try:
-        # Get summary
-        summary = wikipedia.summary(
-            query, sentences=3, auto_suggest=False
-        )  # auto_suggest=False stops the thing from giving dumb suggestions
-        if len(summary) > 1990:  # Keep under Discord limits (2000 char)
-            summary = summary[:1990] + "..."
-        await ctx.send(f"**{query}**:\n{summary}")  # Sends the summary
+        server_owner = await ctx.guild.fetch_owner()
+        # Stops you from trying to ban the server owner lol
+        if user.id == server_owner.id:
+            await ctx.send("❌ You can't ban the server owner", ephemeral=True)
+            return
 
-    # Error Handling
-    except wiki_exceptions.DisambiguationError as e:
-        # For when you're not specific enough
-        print(
-            f"wikipedia DisambiguationError for query '{query}': {e.options[:5]}"
-        )  # Logs the first few options
-        options_list = "\n- ".join(e.options[:5])  # Shows the first 5 suggestions
-        await ctx.send(
-            f"❌ Your query '{query}' could refer to multiple pages. Please be more specific\n"
-            f"Did you mean:\n- {options_list}",
-            ephemeral=True,
-        )
-    except wiki_exceptions.PageError:
-        # For when the page doesn't exist
-        print(f"wikipedia PageError for query '{query}'")
-        await ctx.send(
-            f"❌ Couldn't find a wikipedia page for '{query}' try different wording?",
-            ephemeral=True,
-        )
-    except wiki_exceptions.wikipediaException as e:
-        # Find other errors from the wikipedia lib
-        print(f"Wikipedia lib error for query '{query}': {e}")
-        await ctx.send(
-            "❌ An error occurred while contacting wikipedia try again later",
-            ephemeral=True,
-        )
+        author: Member = ctx.author
+        bot_id = await ctx.guild.fetch_member(ctx.bot.user.id)
+        if not bot_id:
+            raise Exception("Bot id object not found")
+        if target_member:
+            # Check author roles
+            if (
+                author != server_owner
+                and target_member.top_role
+                and (not author.top_role or target_member.top_role >= author.top_role)
+            ):
+                await ctx.send(
+                    "❌ Your role isn't high enough to ban that user", ephemeral=True
+                )
+                return
+            # Check bot perms
+            if target_member.top_role and (
+                not bot_id.top_role or target_member.top_role >= bot_id.top_role
+            ):
+                await ctx.send(
+                    "❌ My role isn't high enough to ban that user", ephemeral=True
+                )
+                return
+
     except Exception as e:
-        # Find other unexpected errors
-        print(f"Unexpected error in /wikipedia command for query '{query}': {e}")
+        print(f"Hierarchy check error (ban): {e}")
         traceback.print_exc()
         await ctx.send(
-            "❌ An unexpected error occurred please report this on the GitHub in my bio if it persists",
+            "❌ An error occurred while checking roles if this presists please report it on the GitHub in my bio",
+            ephemeral=True,
+        )
+        return
+    try:
+        # Ban them
+        await ctx.guild.ban(
+            user.id,
+            delete_message_days=delete_messages,
+            reason=reason or f"Banned by {ctx.author.display_name}",
+        )
+
+        reason_clause = f" because {reason}" if reason else "."
+        delete_clause = (
+            f" and messages from last {delete_messages} days were deleted"
+            if delete_messages > 0
+            else ""
+        )
+        await ctx.send(f"✅ Banned {user.mention}{reason_clause}{delete_clause}")
+        print(
+            f"Banned {user} (ID: {user.id}). Reason: {reason or 'None'} deleted days: {delete_messages}"
+        )
+
+    # Error handling
+    except errors.Forbidden:
+        await ctx.send(
+            "❌ Permission denied: Check if I have the 'Ban Members' perm and that my role is high enough",
+            ephemeral=True,
+        )
+        print(f"ERROR: Forbidden - Cannot ban {user} ceck perms/roles")
+    except errors.HTTPException as e:
+        await ctx.send(f"❌ Discord API error: {e.status} - {e.text}", ephemeral=True)
+        print(f"ERROR: HTTP Exception {e.status} - {e.text}")
+    except Exception as e:
+        print(f"Ban command error: {e}")
+        traceback.print_exc()
+        await ctx.send(
+            "❌ An unexpected error occurred while trying to ban if this presists report it on the GitHub in my bio",
             ephemeral=True,
         )
 
@@ -400,7 +541,9 @@ if __name__ == "__main__":
     try:
         bot.start(BOT_TOKEN)
     except FileNotFoundError:
-        print("ERROR: token.txt not found. Please create it in this same directory")
+        print(
+            "ERROR: token.txt couldn't be found please create it in this same directory and add your bots token"
+        )
     except Exception as e:
-        print(f"ERROR: Failed to start bot - {e}")
+        print(f"ERROR: Failed to start the bot - {e}")
         traceback.print_exc()
